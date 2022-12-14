@@ -5,6 +5,7 @@ import java.awt.BorderLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.JFrame;
 import javax.swing.JList;
+import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
@@ -21,7 +22,10 @@ public class ServerGui {
 
     this.logText.append("SHIT \n");
     this.frame.add(this.logText,BorderLayout.CENTER);
-    this.frame.add( new JScrollPane(this.fileNameList),BorderLayout.WEST);
+
+    JPanel fileViewPanel = new JPanel(new java.awt.GridLayout(1,1));
+    fileViewPanel.add(new JScrollPane(this.fileNameList));
+    this.frame.add(fileViewPanel ,BorderLayout.WEST);
 
     this.frame.setSize(800, 600);
     this.frame.setVisible(true);

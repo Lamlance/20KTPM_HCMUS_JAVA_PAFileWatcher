@@ -10,6 +10,7 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.Set;
 
+import Protocol.Protocol;
 import Server.ClientHandler.ClientHandleThread;
 import Server.ClientInfo.ClientInfo;
 
@@ -40,6 +41,7 @@ public class Server {
         Thread newThread = new Thread(
           new ClientHandleThread(clientInfo, clientName,gui.getLogTextArea(),gui.getFileNameModel())
         );
+        clientInfo.sendQueue.add(String.format("%s&&./",Protocol.SV_CMD_FILELIST));
         newThread.start();
 
       } while (true);
