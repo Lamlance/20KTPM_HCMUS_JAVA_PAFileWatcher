@@ -17,7 +17,9 @@ public class Client {
   BufferedReader reader;
   Path currDir = Paths.get(".");
   LinkedList<String> cmdQueue = new LinkedList<String>();
-  Boolean isRunningCmd = false;
+
+  Socket mySocket;
+  Boolean isInSending = false;
 
   public static void main(String[] args) {
     Client newClient = new Client();
@@ -28,22 +30,27 @@ public class Client {
         Socket s = new Socket("localhost", 9000);
         BufferedWriter buffWriter = new BufferedWriter(new OutputStreamWriter(s.getOutputStream()));
         BufferedReader buffReader = new BufferedReader(new InputStreamReader(s.getInputStream()))) {
-        this.writer = buffWriter;
-        this.reader = buffReader;
+      this.writer = buffWriter;
+      this.reader = buffReader;
+      this.mySocket = s;
 
-        this.writeString("LAM");
+      this.writeString("LAM");
 
-        String name = this.waitAndRead();
-        System.out.println(name);
-        
-        Thread listenThread = new Thread(new WaitForCmdThread());
-        listenThread.start();
+      String name = this.waitAndRead();
+      System.out.println(name);
 
-      do {
-        String msg = this.waitAndRead();
-        System.out.println(msg);
-        cmdQueue.add(msg);
-      } while (true);
+
+      while (mySocket.isConnected()) {
+        if (!this.isInSending) {
+          System.out.println("Waiting for msg");
+          String msg = this.waitAndRead();
+          this.isInSending = true;
+          System.out.println(msg);
+          cmdQueue.add(msg);
+          HandleCmd();
+        }
+      }
+      ;
 
     } catch (IOException e) {
       e.printStackTrace();
@@ -68,8 +75,6 @@ public class Client {
   }
 
   private void hadnleFileList(String path) {
-    System.out.println("Handle FileList");
-
     if (path.equalsIgnoreCase("../")) {
       this.currDir = this.currDir.getParent();
     }
@@ -78,38 +83,27 @@ public class Client {
     }
 
     String[] file = this.getAllFileName();
+    String fileListMsg = String.join(",", file);
     try {
-      for (String nameString : file) {
-        this.writeString(nameString);
-        System.out.println(nameString);
-      }
-      this.writeString("END&&END");
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    isRunningCmd = false;
+      this.writeString(fileListMsg);
+    } catch (IOException e) {e.printStackTrace();}
   }
 
-  private class WaitForCmdThread implements Runnable {
-    @Override
-    public void run() {
-      do {
-        if (isRunningCmd || (cmdQueue.size() < 1)) {
-          continue;
-        }
-        String cmdMsg = cmdQueue.pop();
-        String cmd = cmdMsg.split("&&")[0];
-        switch (cmd) {
-          case Protocol.SV_CMD_FILELIST:
-            hadnleFileList(cmdMsg.split("&&")[1]);
-            isRunningCmd = true;
-            break;
-
-          default:
-            break;
-        }
-      } while (true);
+  public void HandleCmd() {
+    if (cmdQueue.size() > 0 && isInSending) {
+      String cmdMsg = cmdQueue.pop();
+      System.out.println("Handling " + cmdMsg);
+      String cmd = cmdMsg.split("&&")[0];
+      switch (cmd) {
+        case Protocol.SV_CMD_FILELIST:
+          System.out.println("Handle FileList");
+          hadnleFileList(cmdMsg.split("&&")[1]);
+          System.out.println("Finished Handle FileList");
+          break;
+        default:
+          break;
+      }
+      isInSending = false;
     }
-
   }
 }
