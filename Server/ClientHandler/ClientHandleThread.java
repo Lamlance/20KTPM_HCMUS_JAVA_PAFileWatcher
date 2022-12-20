@@ -18,53 +18,55 @@ public abstract class ClientHandleThread implements Runnable {
   protected JTextArea area = null;
   protected DefaultListModel<String> pathList = null;
 
-  private LinkedList<String> watchMsgStack = new LinkedList<String>();
-  private LinkedList<String> cmdStack = new LinkedList<String>();
+  private int reCount = 0;
 
-  private Map<Integer, Thread> watchThreadMap = new HashMap<Integer, Thread>();
-  private int threadCounter = 0;
-
-  public ClientHandleThread(String nameString){
+  public ClientHandleThread(String nameString) {
     this.name = nameString;
     Initialize();
-  } 
+  }
+
   public abstract void Initialize();
+  public abstract void DisconnectHandel();
   public abstract ClientInfo getClientInfo();
 
   @Override
   public void run() {
     getClientInfo().isInReading = false;
 
-    Thread readThread = new Thread(new WaitAndReadMsg());
+    Thread handelThread = new Thread(new WaitAndHandelMsg());
+    Thread readThread = new Thread(new WatchForEventThread());
     readThread.start();
+    handelThread.start();
 
-    while (this.getClientInfo().socket.isConnected()) {
-      if (getClientInfo().sendQueue.size() > 0 && !getClientInfo().isInReading) {
+    while (this.getClientInfo().socket.isConnected() && reCount < 10) {
+      if (getClientInfo().sendQueue.size() > 0) {
         String msg = getClientInfo().sendQueue.pop();
         try {
           getClientInfo().sendString(msg);
-          getClientInfo().isInReading = true;
-          this.cmdStack.add(msg);
-        } catch (IOException e){}
+        } catch (IOException e) {
+          reCount += 1;
+        }
       }
     }
-    ;
-
+    System.out.println("Client disconnect");
+    DisconnectHandel();
   }
 
-  private void HandleReadFileList() {
+  private void HandleReadFileList(String namesString) {
     try {
-      String namesString = getClientInfo().waitForString();
       String[] nameArr = namesString.split(",");
       SwingUtilities.invokeAndWait(new UpdateStringList(nameArr));
-    } catch (Exception e) {}
+    } catch (Exception e) {
+    }
   }
 
-  private void HandleWatchFile() {
-    this.threadCounter += 1;
-    Thread newWatch = new Thread(new WatchFile(this.threadCounter));
-    this.watchThreadMap.put(this.threadCounter, newWatch);
-    newWatch.start();
+  private void HandleWatchUpdate(String updateLog) {
+    try {
+      String[] updateMsgs = updateLog.split(",");
+      SwingUtilities.invokeAndWait(new UpdateLogArea(updateMsgs));
+    } catch (Exception e) {
+    }
+
   }
 
   public class UpdateStringList implements Runnable {
@@ -86,64 +88,59 @@ public abstract class ClientHandleThread implements Runnable {
   }
 
   public class UpdateLogArea implements Runnable {
-    private String msg;
+    private String[] msg;
 
-    UpdateLogArea(String watchMsg) {
+    UpdateLogArea(String[] watchMsg) {
       this.msg = watchMsg;
     }
 
     @Override
     public void run() {
-      area.append(String.format("%s \n", msg));
+      for (String string : this.msg) {
+        area.append(String.format("%s \n", string));
+      }
     }
 
   }
 
-  public class WaitAndReadMsg implements Runnable {
+  public class WaitAndHandelMsg implements Runnable {
     @Override
     public void run() {
-      while (getClientInfo().socket.isConnected()) {
-        if (cmdStack.size() > 0 && getClientInfo().isInReading) {
-          String cmdMsg = cmdStack.pop();
+      while (getClientInfo().socket.isConnected() && reCount < 10) {
+        if ( getClientInfo().msgQueue.size() > 0) {
+          String cmdMsg = getClientInfo().msgQueue.pop();
           String cmd = cmdMsg.split("&&")[0];
+
           switch (cmd) {
-            case Protocol.SV_CMD_FILELIST:{
-              HandleReadFileList();
+            case Protocol.SV_CMD_FILELIST: {
+              HandleReadFileList(cmdMsg.split("&&")[1]);
               break;
             }
-
-            case Protocol.SV_START_WATCH:
-              HandleWatchFile();
+            case Protocol.CL_EVENT_MSG: {
+              HandleWatchUpdate(cmdMsg.split("&&")[1]);
               break;
+            }
             default:
               break;
           }
-          getClientInfo().isInReading = false;
         }
       }
     }
   }
 
-  private class WatchFile implements Runnable {
-    private int watchId;
-
-    WatchFile(int id) {
-      this.watchId = id;
-    }
-
+  public class WatchForEventThread implements Runnable {
     @Override
     public void run() {
-      while (getClientInfo().socket.isConnected()) {
-        if (!getClientInfo().isInReading) {
-          try {
-            String watchUpdate = getClientInfo().waitForString();
-            SwingUtilities.invokeLater(new UpdateLogArea(watchUpdate));
-          } catch (IOException e) {
-            e.printStackTrace();
-          }
+      while (getClientInfo().socket.isConnected() && reCount < 10) {
+        try {
+          String eventMsg = getClientInfo().waitForString();
+          getClientInfo().msgQueue.add(eventMsg);
+        } catch (IOException e) {
+          reCount += 1;
         }
       }
-      ;
+
     }
+
   }
 }

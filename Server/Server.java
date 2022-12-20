@@ -35,6 +35,8 @@ public class Server {
       server = new ServerSocket(9000);
       this.gui = new ServerGui();
       this.gui.SetNavBtnHandler(new NavBtnHandler());
+      this.gui.SetWatchBtnHandler(new WatchBtnHandler());
+      this.gui.SetClientBoxHandler(new ClientBoxHandler());
 
       do {
         System.out.println("Server is listening");
@@ -46,7 +48,6 @@ public class Server {
         gui.clientNameModel.addElement(clientName);
 
         Thread newThread = new Thread(new ClientThread(clientName));
-        clientInfo.sendQueue.add(String.format("%s&&./",Protocol.SV_CMD_FILELIST));
 
         newThread.start();
 
@@ -60,7 +61,7 @@ public class Server {
   private String AcceptClient(ClientInfo clientInfo) {
     try {
       String name = clientInfo.waitForString();
-      String newName = this.ClientNameChecker(name);
+      String newName = String.format("%s:%d", name,clientInfo.socket.getPort());
       clientInfo.sendString(newName);
       
       return newName;
@@ -69,20 +70,6 @@ public class Server {
       e.printStackTrace();
     }
     return null;
-  }
-
-  private String ClientNameChecker(String nameString) {
-    if (!this.clientMap.containsKey(nameString)) {
-      return nameString;
-    }
-
-    Integer counter = 0;
-    Set<String> clientName = this.clientMap.keySet();
-    for (String name : clientName) {
-      counter += (name.equalsIgnoreCase(nameString)) ? 1 : 0;
-    }
-    nameString = nameString.concat(String.format("$$%d", counter));
-    return nameString;
   }
 
   class NavBtnHandler implements java.awt.event.ActionListener{
@@ -95,6 +82,28 @@ public class Server {
       }
       String cmd = String.format("%s&&%s",Protocol.SV_CMD_FILELIST,nav);
       clientMap.get(clientName).sendQueue.add(cmd);
+    }
+  }
+  class WatchBtnHandler implements java.awt.event.ActionListener{
+    @Override
+    public void actionPerformed(ActionEvent e) { 
+      String clientName = gui.getCurrClientName();
+      String nav = gui.getCurrNav();
+      if(nav == null){
+        return;
+      }
+      String cmd = String.format("%s&&%s",Protocol.SV_START_WATCH,nav);
+      clientMap.get(clientName).sendQueue.add(cmd);
+    }    
+  }
+  class ClientBoxHandler implements java.awt.event.ActionListener{
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      String clientName = gui.getCurrClientName();
+      if(clientName == null){
+        return;
+      }
+      clientMap.get(clientName).sendQueue.add(String.format("%s&&./",Protocol.SV_CMD_FILELIST));
     }
     
   }
@@ -112,6 +121,14 @@ public class Server {
     public ClientInfo getClientInfo() {
       return clientMap.get(this.name);
     }
+    @Override
+    public void DisconnectHandel() {
+      clientMap.remove(this.name);
+      gui.clientNameModel.removeElement(this.name);
+      gui.fileNameList.clearSelection();
+      gui.getFileNameModel().clear();
+    }
     
   }
+
 }

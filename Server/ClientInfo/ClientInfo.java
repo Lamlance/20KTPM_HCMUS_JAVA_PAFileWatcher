@@ -2,6 +2,7 @@ package Server.ClientInfo;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -14,9 +15,9 @@ public class ClientInfo {
   public BufferedWriter writer;
 
   public LinkedList<String> sendQueue = new LinkedList<String>();
-  public Boolean isInReading = false;
+  public LinkedList<String> msgQueue = new LinkedList<String>();
 
-  public String curCmd = "";
+  public Boolean isInReading = false;
 
   public ClientInfo(Socket client) throws IOException {
     this.socket = client;
@@ -33,4 +34,5 @@ public class ClientInfo {
     this.writer.newLine();
     this.writer.flush();
   }
+
 }
