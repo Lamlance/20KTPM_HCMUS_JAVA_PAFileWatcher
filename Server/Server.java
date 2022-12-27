@@ -84,6 +84,7 @@ public class Server {
       clientMap.get(clientName).sendQueue.add(cmd);
     }
   }
+
   class WatchBtnHandler implements java.awt.event.ActionListener{
     @Override
     public void actionPerformed(ActionEvent e) { 
@@ -96,6 +97,7 @@ public class Server {
       clientMap.get(clientName).sendQueue.add(cmd);
     }    
   }
+
   class ClientBoxHandler implements java.awt.event.ActionListener{
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -108,14 +110,11 @@ public class Server {
     
   }
 
+
+
   class ClientThread extends ClientHandleThread{
     public ClientThread(String nameString) {
       super(nameString);
-    }
-    @Override
-    public void Initialize() {
-     this.area = gui.getLogTextArea();
-     this.pathList = gui.getFileNameModel();
     }
     @Override
     public ClientInfo getClientInfo() {
@@ -127,6 +126,18 @@ public class Server {
       gui.clientNameModel.removeElement(this.name);
       gui.fileNameList.clearSelection();
       gui.getFileNameModel().clear();
+    }
+    @Override
+    public void LogEvent(String msg) {
+      String[] datas = msg.split(",");
+      if(datas.length >= 2){
+        gui.logToTable(this.name,datas[0],datas[1]);
+      }
+      return;
+    }
+    @Override
+    public void UpdateNavList(String[] files) {
+      gui.updateNavList(files);
     }
     
   }

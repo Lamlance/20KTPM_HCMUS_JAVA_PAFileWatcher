@@ -1,5 +1,6 @@
 package Client;
 
+import java.awt.event.ActionEvent;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -28,43 +29,73 @@ public class Client {
   ArrayList<FileInfo> watchings = new ArrayList<FileInfo>();
   LinkedList<String> msgQueue = new LinkedList<String>();
 
+  private Thread listenThread = new Thread(new ListenThread());
+  private ClientGui gui;
+
+  int errCount = 0;
+
   public static void main(String[] args) {
     Client newClient = new Client();
   }
 
   Client() {
-    try (
-        Socket s = new Socket("localhost", 9000);
-        BufferedWriter buffWriter = new BufferedWriter(new OutputStreamWriter(s.getOutputStream()));
-        BufferedReader buffReader = new BufferedReader(new InputStreamReader(s.getInputStream()))) {
+    this.gui = new ClientGui();
+    gui.SetConnectionBtn(new ConnectBtnHandel());
 
-      this.writer = buffWriter;
-      this.reader = buffReader;
-      this.mySocket = s;
+  }
 
-      this.writeString("LAM");
-
-      this.myName = this.waitAndRead();
-      System.out.println(myName);
-
-      Thread watchThread = new Thread(new FileChangeWatcher());
-      watchThread.start();
-
-      while (mySocket.isConnected()) {
-        if (!this.isInSending) {
-          System.out.println("Waiting for msg");
-          String msg = this.waitAndRead();
-          this.isInSending = true;
-          System.out.println(msg);
-          cmdQueue.add(msg);
-          HandleCmd();
-        }
-      }
-      ;
-
-    } catch (IOException e) {
-      e.printStackTrace();
+  private class ConnectBtnHandel implements java.awt.event.ActionListener {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      listenThread.start();
     }
+  }
+
+  private class ListenThread implements Runnable {
+    @Override
+    public void run() {
+      try (
+          Socket s = new Socket("localhost", 9000);
+          BufferedWriter buffWriter = new BufferedWriter(new OutputStreamWriter(s.getOutputStream()));
+          BufferedReader buffReader = new BufferedReader(new InputStreamReader(s.getInputStream()))) {
+
+        writer = buffWriter;
+        reader = buffReader;
+        mySocket = s;
+
+        writeString("LAM");
+
+        myName = waitAndRead();
+        System.out.println(myName);
+
+        Thread watchThread = new Thread(new FileChangeWatcher());
+        watchThread.start();
+
+        while (mySocket.isConnected() && errCount <= 10) {
+          try {
+            if (!isInSending) {
+              System.out.println("Waiting for msg");
+              String msg = waitAndRead();
+              isInSending = true;
+              System.out.println(msg);
+              cmdQueue.add(msg);
+              HandleCmd();
+            }
+          } catch (IOException e) {
+            // e.printStackTrace();
+            errCount += 1;
+          }
+        }
+        System.out.println("Closing socket");
+        mySocket.close();
+        gui.CloseFrame();
+
+      } catch (IOException e) {
+        // e.printStackTrace();
+        errCount += 1;
+      }
+    }
+
   }
 
   private void writeString(String msg) throws IOException {
@@ -80,12 +111,19 @@ public class Client {
 
   private String[] getAllFileName() {
     File file = new File(this.currDir.toString());
+    if (file.list() == null) {
+      return (new String[0]);
+    }
     String[] names = file.list();
     return names;
   }
 
-  private void changePath(String path){
-    if (!path.equalsIgnoreCase("./") ) {
+  private void changePath(String path) {
+    if (this.currDir.toFile().isFile()) {
+      return;
+    }
+
+    if (!path.equalsIgnoreCase("./")) {
       this.currDir = this.currDir.resolve(path);
     }
     System.out.println("Path is now " + this.currDir.toString());
@@ -93,35 +131,38 @@ public class Client {
 
   private void handelFileList(String path) {
     changePath(path);
-
-    String[] file = this.getAllFileName();
-    String fileListMsg = String.join(",", file);
     try {
-      this.writeString(String.format("%s&&%s",Protocol.SV_CMD_FILELIST,fileListMsg));
-    } catch (IOException e) {e.printStackTrace();}
+      String[] file = this.getAllFileName();
+      System.out.println(file.length);
+      if (file.length != 0) {
+        String fileListMsg = String.join(",", file);
+        this.writeString(String.format("%s&&%s", Protocol.SV_CMD_FILELIST, fileListMsg));
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 
-  private void handelFileWatch(String path){
+  private void handelFileWatch(String path) {
     changePath(path);
-    Path filePath = this.currDir;
-    File file = new File(filePath.toString());
-    if(!file.exists()){
+    File file = this.currDir.toFile();
+    if (!file.exists()) {
       return;
     }
     this.watchings.add(new FileInfo(file));
   }
 
   public void HandleCmd() {
-    
+
     if (cmdQueue.size() > 0 && isInSending) {
       String cmdMsg = cmdQueue.pop();
       String cmd = cmdMsg.split("&&")[0];
       switch (cmd) {
-        case Protocol.SV_CMD_FILELIST:{
+        case Protocol.SV_CMD_FILELIST: {
           handelFileList(cmdMsg.split("&&")[1]);
           break;
         }
-        case Protocol.SV_START_WATCH:{
+        case Protocol.SV_START_WATCH: {
           handelFileWatch(cmdMsg.split("&&")[1]);
           break;
         }
@@ -132,49 +173,57 @@ public class Client {
     }
   }
 
-  public class FileChangeWatcher implements Runnable{
+  public class FileChangeWatcher implements Runnable {
     @Override
     public void run() {
-      while(mySocket.isConnected()){
+      while (mySocket.isConnected() && errCount <= 10) {
         try {
           Thread.sleep(5000);
-        } catch (InterruptedException e) {e.printStackTrace();}
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+          errCount += 1;
+        }
 
         for (FileInfo file : watchings) {
-          if(file.hasChange()){
+          if (file.hasChange()) {
             msgQueue.add(file.makeMsg());
             System.out.println(file.makeMsg());
           }
         }
-        if(msgQueue.size() > 0 && !isInSending){
+        if (msgQueue.size() > 0 && !isInSending) {
           String msg = String.join(",", msgQueue);
           try {
-            writeString(String.format("%s&&%s",Protocol.CL_EVENT_MSG,msg));
+            writeString(String.format("%s&&%s", Protocol.CL_EVENT_MSG, msg));
             msgQueue.clear();
-          } catch (IOException e) {e.printStackTrace();}
+          } catch (IOException e) {
+            e.printStackTrace();
+            errCount += 1;
+          }
         }
-      }      
+      }
     }
 
   }
 
-  private class FileInfo{
+  private class FileInfo {
     private File file;
     private long prevModify;
 
-    public FileInfo(File myFile){
+    public FileInfo(File myFile) {
       this.file = myFile;
       this.prevModify = this.file.lastModified();
     }
-    public boolean hasChange(){
-      if(this.file.lastModified() != this.prevModify){
+
+    public boolean hasChange() {
+      if (this.file.lastModified() != this.prevModify) {
         this.prevModify = this.file.lastModified();
         return true;
       }
       return false;
     }
-    public String makeMsg(){
-      return String.format("%s: %s has changed", myName,this.file.getName());
+
+    public String makeMsg() {
+      return String.format("%s,%s", this.file.getName(), this.prevModify);
     }
   }
 }
