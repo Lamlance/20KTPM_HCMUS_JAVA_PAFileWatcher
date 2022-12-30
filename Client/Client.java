@@ -11,6 +11,10 @@ import java.net.Socket;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import Protocol.Protocol;
@@ -157,7 +161,12 @@ public class Client {
     if (!file.exists()) {
       return;
     }
-    this.watchings.add(new FileInfo(file));
+    try {
+      this.watchings.add(new FileInfo(file));
+    } catch (Exception e) {}
+
+    this.currDir = FileSystems.getDefault().getPath("").toAbsolutePath();
+    handelFileList("./");
   }
 
   public void HandleCmd() {
@@ -186,15 +195,16 @@ public class Client {
     public void run() {
       while (mySocket.isConnected() && errCount <= 10) {
         try {
-          Thread.sleep(5000);
+          Thread.sleep(1000);
         } catch (InterruptedException e) {
           e.printStackTrace();
           errCount += 1;
         }
 
         for (FileInfo file : watchings) {
-          if (file.hasChange()) {
-            msgQueue.add(file.makeMsg());
+          String msg = file.makeMsg();
+          if (msg != null) {
+            msgQueue.add(msg);
             System.out.println(file.makeMsg());
           }
         }
@@ -214,11 +224,24 @@ public class Client {
   }
 
   private class FileInfo {
+    private WatchService ws = null;
+    private WatchKey wk = null;
     private File file;
+    private Path myPath = null;
     private long prevModify;
 
-    public FileInfo(File myFile) {
+    public FileInfo(File myFile) throws IOException {
       this.file = myFile;
+
+      if(file.isDirectory()){
+        this.ws = FileSystems.getDefault().newWatchService();
+        this.myPath = FileSystems.getDefault().getPath(myFile.getAbsolutePath()) ;
+        this.wk = this.myPath.register(ws, 
+        StandardWatchEventKinds.ENTRY_CREATE,
+        StandardWatchEventKinds.ENTRY_DELETE,
+        StandardWatchEventKinds.ENTRY_MODIFY);
+      }
+      
       this.prevModify = this.file.lastModified();
     }
 
@@ -228,10 +251,25 @@ public class Client {
         return true;
       }
       return false;
+
     }
 
     public String makeMsg() {
-      return String.format("%s,%s", this.file.getName(), this.prevModify);
+      if(this.file.isDirectory()){
+        for(WatchEvent<?> event : this.wk.pollEvents()){
+          String eventMsg = ((Path) event.context()) + " " + event.kind().toString() ;
+          if(!eventMsg.isEmpty() && !eventMsg.isBlank()){
+            msgQueue.add(String.format("%s,%s", eventMsg , this.prevModify));
+          }
+        }
+        this.prevModify = file.lastModified();
+        return null;
+      }
+      if(hasChange()){
+        msgQueue.add(String.format("%s,%s", this.file.getName() , this.prevModify));
+        return String.format("%s,%s", this.file.getName() , this.prevModify);
+      }
+      return null;
     }
   }
 }
