@@ -2,6 +2,7 @@ package Client;
 
 import java.awt.AWTEvent;
 import java.awt.BorderLayout;
+import java.awt.Color;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -19,10 +20,12 @@ public class ClientGui {
   private JButton connecBtn = new JButton("Connect");
 
   private JLabel statusLbl = new JLabel("Disconnected");
+
   ClientGui(){
     this.adressField.setText("localhost");
     this.portField.setText(Integer.toString(9000));
     this.nameField.setText("LAM");
+    this.statusLbl.setForeground(Color.RED);
 
     JFrame.setDefaultLookAndFeelDecorated(true);
     this.frame = new JFrame("File watcher client");
@@ -68,6 +71,9 @@ public class ClientGui {
       return 9000;
     }
   }
+  public String getName(){
+    return this.nameField.getText();
+  }
 
   public void disableActionTab(){
     this.adressField.setEditable(false);
@@ -77,6 +83,11 @@ public class ClientGui {
 
   public void SetConnectionBtn(java.awt.event.ActionListener ls) {
     connecBtn.addActionListener(ls);
+  }
+
+  public void SetStatus(boolean isConnected){
+    this.statusLbl.setText(isConnected ? "Connected" : "Disconnected");
+    this.statusLbl.setForeground(isConnected ? Color.GREEN : Color.RED);
   }
 
   public void CloseFrame(){

@@ -47,15 +47,21 @@ public class Client {
   private class ConnectBtnHandel implements java.awt.event.ActionListener {
     @Override
     public void actionPerformed(ActionEvent e) {
+
       listenThread.start();
+
     }
   }
 
   private class ListenThread implements Runnable {
     @Override
     public void run() {
+      String address = gui.getAddress();
+      int port = gui.getPortNumber();
+      String name = gui.getName();
+
       try (
-          Socket s = new Socket("localhost", 9000);
+          Socket s = new Socket(address, port);
           BufferedWriter buffWriter = new BufferedWriter(new OutputStreamWriter(s.getOutputStream()));
           BufferedReader buffReader = new BufferedReader(new InputStreamReader(s.getInputStream()))) {
 
@@ -63,7 +69,9 @@ public class Client {
         reader = buffReader;
         mySocket = s;
 
-        writeString("LAM");
+
+        gui.SetStatus(true);
+        writeString(name);
 
         myName = waitAndRead();
         System.out.println(myName);
@@ -88,12 +96,12 @@ public class Client {
         }
         System.out.println("Closing socket");
         mySocket.close();
-        gui.CloseFrame();
-
       } catch (IOException e) {
         // e.printStackTrace();
         errCount += 1;
       }
+      gui.SetStatus(false);
+      errCount = 0;
     }
 
   }

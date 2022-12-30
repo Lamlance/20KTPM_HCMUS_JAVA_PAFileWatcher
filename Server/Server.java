@@ -126,6 +126,8 @@ public class Server {
       gui.clientNameModel.removeElement(this.name);
       gui.fileNameList.clearSelection();
       gui.getFileNameModel().clear();
+      System.out.println("Client disconnect");
+
     }
     @Override
     public void LogEvent(String msg) {

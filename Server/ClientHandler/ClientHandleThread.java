@@ -22,8 +22,11 @@ public abstract class ClientHandleThread implements Runnable {
   }
 
   public abstract void DisconnectHandel();
+
   public abstract ClientInfo getClientInfo();
+
   public abstract void LogEvent(String msg);
+
   public abstract void UpdateNavList(String[] files);
 
   @Override
@@ -45,7 +48,6 @@ public abstract class ClientHandleThread implements Runnable {
         }
       }
     }
-    System.out.println("Client disconnect");
     DisconnectHandel();
   }
 
@@ -68,31 +70,32 @@ public abstract class ClientHandleThread implements Runnable {
 
   }
 
-
   public class WaitAndHandelMsg implements Runnable {
     @Override
     public void run() {
       while (getClientInfo().socket.isConnected() && reCount < 10) {
-        if ( getClientInfo().msgQueue.size() > 0) {
-          String cmdMsg = getClientInfo().msgQueue.pop();
-          
-          String[] msgs = cmdMsg.split("&&");
-          if(msgs.length < 2){
-            continue;
-          }
-
-
-          switch (msgs[0]) {
-            case Protocol.SV_CMD_FILELIST: {
-              HandleReadFileList(msgs[1]);
-              break;
+        if (getClientInfo().msgQueue.size() > 0) {
+          try {
+            String cmdMsg = getClientInfo().msgQueue.pop();
+            String[] msgs = cmdMsg.split("&&");
+            if (msgs.length < 2) {
+              continue;
             }
-            case Protocol.CL_EVENT_MSG: {
-              HandleWatchUpdate(msgs[1]);
-              break;
+
+            switch (msgs[0]) {
+              case Protocol.SV_CMD_FILELIST: {
+                HandleReadFileList(msgs[1]);
+                break;
+              }
+              case Protocol.CL_EVENT_MSG: {
+                HandleWatchUpdate(msgs[1]);
+                break;
+              }
+              default:
+                break;
             }
-            default:
-              break;
+          } catch (Exception e) {
+            // TODO: handle exception
           }
         }
       }
