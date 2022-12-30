@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+Created-By: 19 (Oracle Corporation)
+Main-Class: Client.Client
+Main: Client.Client
+

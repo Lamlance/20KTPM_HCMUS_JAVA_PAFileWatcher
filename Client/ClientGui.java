@@ -12,13 +12,17 @@ import javax.swing.JTextField;
 public class ClientGui {
   private JFrame frame;
   
-  private JTextField adressField = new JTextField("localhost");
-  private JTextField portField = new JTextField("9000");
-  private JTextField nameField = new JTextField("LAM");
+  private JTextField adressField = new JTextField(15);
+  private JTextField portField = new JTextField(5);
+  private JTextField nameField = new JTextField(8);
 
   private JButton connecBtn = new JButton("Connect");
 
+  private JLabel statusLbl = new JLabel("Disconnected");
   ClientGui(){
+    this.adressField.setText("localhost");
+    this.portField.setText(Integer.toString(9000));
+    this.nameField.setText("LAM");
 
     JFrame.setDefaultLookAndFeelDecorated(true);
     this.frame = new JFrame("File watcher client");
@@ -42,8 +46,11 @@ public class ClientGui {
     actionPanel.add(portPanel);
     actionPanel.add(namePanel);
 
+    JPanel infoPanel = new JPanel(new BorderLayout());
+    infoPanel.add(this.statusLbl,BorderLayout.PAGE_START);
+
     this.frame.add(actionPanel,BorderLayout.PAGE_START);
-    
+    this.frame.add(infoPanel,BorderLayout.CENTER);
     this.frame.add(this.connecBtn, BorderLayout.PAGE_END);
 
     // this.frame.setSize(600, 200);
