@@ -46,9 +46,9 @@ public class Server {
         clientMap.put(clientName, clientInfo);
 
         gui.clientNameModel.addElement(clientName);
+        gui.logToTable(clientName,"Connected","");
 
         Thread newThread = new Thread(new ClientThread(clientName));
-
         newThread.start();
 
       } while (true);
@@ -110,8 +110,6 @@ public class Server {
     
   }
 
-
-
   class ClientThread extends ClientHandleThread{
     public ClientThread(String nameString) {
       super(nameString);
@@ -127,7 +125,7 @@ public class Server {
       gui.fileNameList.clearSelection();
       gui.getFileNameModel().clear();
       System.out.println("Client disconnect");
-
+      gui.logToTable(this.name,"Disconnected","");
     }
     @Override
     public void LogEvent(String msg) {

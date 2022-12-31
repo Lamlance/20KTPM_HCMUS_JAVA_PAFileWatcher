@@ -75,6 +75,7 @@ public class Client {
 
 
         gui.SetStatus(true);
+        gui.disableActionTab();
         writeString(name);
 
         myName = waitAndRead();
